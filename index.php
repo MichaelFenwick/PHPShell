@@ -6,6 +6,9 @@
 </head>
 <body>
 <div id='output'></div>
-<input id='prompt' name='prompt'/>
+<div id='prompt_bar'>
+	<label id='prompt' for='input'></label><br />
+	<input id='input' name='input'/>
+</div>
 </body>
 </html>
