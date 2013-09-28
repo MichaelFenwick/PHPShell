@@ -1,34 +1,72 @@
 var history = [];
 var historyHashMap = [];
+var historyPointer = null;
+var usingHistory = false;
 
 $(document).ready(function () {
 	getHistory();
 
-	$("#input").on("keypress", function (e) {
+	$("#input").on("keydown", function (e) {
 		var input = $(this).val();
-		if ((e.keyCode ? e.keyCode : e.which) == 13) {
-			$.ajax({
-				url:      "exec.php",
-				data:     {input: input},
-				dataType: "json",
-				type:     "POST",
-				success:  function (data) {
-					//clear the input prompt for the next command.
-					$("#input").val("");
-
-					postOutput(data.outputs);
-					setPrompt(data.pwd + " >> ");
-					pushHistory(input);
-				},
-				failure:  function (data) {
-					postOutput(["<span class='error'>An error occurred.  Please check the javascript console and XHR responses.</span>"]);
-					console.log("error");
-					console.log(data);
+		var keyCode = e.keyCode ? e.keyCode : e.which;
+		switch (keyCode) {
+			case 13: //enter
+				if (!usingHistory) { //don't maintain history pointer if the user edited the input.
+					historyPointer = null;
 				}
-			});
+
+				$.ajax({
+					url:      "exec.php",
+					data:     {input: input},
+					dataType: "json",
+					type:     "POST",
+					success:  function (data) {
+						//clear the input prompt for the next command.
+						$("#input").val("");
+
+						postOutput(data.outputs);
+						setPrompt(data.pwd + " >> ");
+						pushHistory(input);
+					},
+					failure:  function (data) {
+						postOutput(["<span class='error'>An error occurred.  Please check the javascript console and XHR responses.</span>"]);
+						console.log("error");
+						console.log(data);
+					}
+				});
+				break;
+			case 38: //up
+				e.preventDefault();
+				traverseHistory(-1);
+				break;
+			case 40: //down
+				e.preventDefault();
+				traverseHistory(1);
+				break;
+			case 39: //do nothing on other arrow keys
+			case 41:
+				break;
+			default:
+				usingHistory = false;
 		}
 	});
 });
+
+function traverseHistory(amount) {
+	var $input = $("#input");
+	if (!$input.val()) { //don't move the pointer if there is nothing in the box, just redisplay what the pointer is pointing at
+		amount = 0;
+	}
+
+	if (historyPointer === null) {
+		historyPointer = history.length - 1;
+	} else {
+		historyPointer = Math.min(Math.max(0, (historyPointer + amount)), history.length - 1);
+	}
+
+	usingHistory = true;
+	$input.val(history[historyPointer]);
+}
 
 function postOutput(outputs) {
 	//add the new output to the output window.
