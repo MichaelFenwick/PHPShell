@@ -7,47 +7,55 @@ if (!isset($_SESSION['pwd'])) {
 chdir($_SESSION['pwd']);
 
 $inputs = isset($_POST['input']) ? array($_POST['input']) : null;
+$historySize = isset($_POST['history']) ? array($_POST['history']) : null;
 
 $outputs = array();
+$history = array();
 
-switch (true) {
-	case !$inputs[0]: //return empty json object on no input.
-		echo "[]";
-		break;
-	/** @noinspection PhpMissingBreakStatementInspection */
-	case preg_match("/^cd\\s+(.*)$/", $inputs[0], $matches):  //TODO: because each time PHP fires up it starts from the same initial directory, chaining cd commands won't work.  To make it work, I'll need to add pwd state into this that it can always chdir to first at the start of a call
-		array_pop($inputs); //remove the cd from the inputs, since we can't actually run it directly through the shell.
-		$chdirSuccess = chdir($matches[1]); //actually change the directory.
-		$cwd = getcwd();
-		if ($chdirSuccess) {
-			$outputs[] = array("Changed path to $cwd");
-			$_SESSION['pwd'] = $cwd;
-		} else {
-			$outputs[] = array("Unable to change path to $cwd");
-		}
-		//add a dir/ls command after the change so we can see the files around us.
-		if (DIRECTORY_SEPARATOR === "/") { //linux
-			$inputs[] = "ls";
-		} else { //windows
-			$inputs[] = "dir";
-		}
-	default:
-		$outputs = array_merge($outputs, runExec($inputs));
+if ($inputs) {
+	$_SESSION['history'] = array_merge($_SESSION['history'] ? $_SESSION['history'] : array(), array_filter($inputs));
+	switch (true) {
+		/** @noinspection PhpMissingBreakStatementInspection */
+		case preg_match("/^cd\\s+(.*)$/", $inputs[0], $matches):
+			array_pop($inputs); //remove the cd from the inputs, since we can't actually run it directly through the shell.
+			$chdirSuccess = chdir($matches[1]); //actually change the directory.
+			$cwd = getcwd();
+			if ($chdirSuccess) {
+				$outputs[] = array("Changed path to $cwd");
+				$_SESSION['pwd'] = $cwd;
+			} else {
+				$outputs[] = array("Unable to change path to $cwd");
+			}
+			//add a dir/ls command after the change so we can see the files around us.
+			if (DIRECTORY_SEPARATOR === "/") { //linux
+				$inputs[] = "ls";
+			} else { //windows
+				$inputs[] = "dir";
+			}
+		default:
+			$outputs = array_merge($outputs, runExec($inputs));
+	}
+}
+
+if ($historySize) {
+	$history = array_slice($_SESSION['history'], is_numeric($historySize) ? -1 * $historySize : null, null, true);
 }
 
 echo json_encode(array(
 	"pwd"     => $_SESSION['pwd'],
-	"outputs" => $outputs
-	));
+	"outputs" => $outputs,
+	"history" => $history
+));
 
 function runExec($inputs) {
 	$outputs = array();
 	foreach ($inputs as $input) {
 		exec($input, $output);
-		$outputs[] = array_map(function($line) {
+		$outputs[] = array_map(function ($line) {
 			return htmlspecialchars($line);
 		}, $output);
 	}
+
 	return $outputs;
 }
 
